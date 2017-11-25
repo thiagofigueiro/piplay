@@ -16,18 +16,16 @@ def signal_handler(signal, frame):
     GPIO.output(ALL_PINS, GPIO.LOW)
     sys.exit(0)
 
-def cycle_pin(pin, interval=1):
+def cycle_pin(pin, interval=0.1):
     print('Pin {} on'.format(pin))
     GPIO.output(pin, GPIO.HIGH)
     time.sleep(interval)
 
     print('Pin {} off'.format(pin))
     GPIO.output(pin, GPIO.LOW)
-    time.sleep(interval)
 
 signal.signal(signal.SIGINT, signal_handler)
 GPIO.setmode(GPIO.BCM)
-#GPIO.setwarnings(False)
 GPIO.setup(ALL_PINS, GPIO.OUT)
 
 while True:
