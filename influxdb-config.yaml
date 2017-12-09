@@ -1,0 +1,27 @@
+# This accepts any keyword argument defined in the InfluxDBClient manual:
+# http://influxdb-python.readthedocs.io/en/stable/api-documentation.html#influxdbclient
+#
+# host (str) – hostname to connect to InfluxDB, defaults to ‘localhost’
+# port (int) – port to connect to InfluxDB, defaults to 8086
+# username (str) – user to connect, defaults to ‘root’
+# password (str) – password of the user, defaults to ‘root’
+# database (str) – database name to connect to, defaults to None
+# ssl (bool) – use https instead of http to connect to InfluxDB, defaults to False
+# verify_ssl (bool) – verify SSL certificates for HTTPS requests, defaults to False
+# timeout (int) – number of seconds Requests will wait for your client to establish a connection, defaults to None
+# retries (int) – number of retries your client will try before aborting, defaults to 3. 0 indicates try until success
+# use_udp (bool) – use UDP to connect to InfluxDB, defaults to False
+# udp_port (int) – UDP port to connect to InfluxDB, defaults to 4444
+# proxies (dict) – HTTP(S) proxy to use for Requests, defaults to {}
+---
+host: '192.168.1.4'
+# port: 8086
+# username: 'root'
+# password: 'root'
+# database: 'example'
+# ssl: false
+# verify_ssl: false
+timeout: 15
+retries: 0
+# use_udp: false
+# udp_port: 4444
