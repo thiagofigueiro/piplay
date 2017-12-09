@@ -36,7 +36,6 @@ e.g.:
 
 """
 import copy
-import datetime
 import logging
 import os
 import pprint
@@ -131,7 +130,7 @@ def influxdb_client(config_filename):
     log.debug('Connecting to InfluxDB with: "{}"'.format(
         pprint.pformat(kwargs)))
     client = InfluxDBClient(**kwargs)
-    database = kwargs.get('database', 'temperature')
+    database = kwargs.get('database', 'default')
     log.debug('Creating and switching to database "{}"'.format(database))
     client.create_database(database)
     client.switch_database(database)
@@ -139,7 +138,7 @@ def influxdb_client(config_filename):
     return client
 
 
-def _temperature_in_scale(temperatures_cfk, scale):
+def temperature_in_scale(temperatures_cfk, scale):
     scale = scale or 'c'
     if scale.lower().startswith('c'):
         temperature = temperatures_cfk[0]
@@ -155,43 +154,46 @@ def _temperature_in_scale(temperatures_cfk, scale):
     return temperature
 
 
-def _measurement_add_tags(tags, metadata):
+def format_measurement_tags(metadata):
+    tags = ''
     for meta_name, meta_value in metadata.items():
-        tags.update({meta_name: meta_value})
+        tags += ',{meta_name}={meta_value}'.format(**locals())
+
+    return tags
 
 
-def new_measurement(sensor_id, metadata, temp_all_units):
-    temperature = _temperature_in_scale(temp_all_units, metadata.get('scale'))
-    measurement = {
-        'measurement': 'temperature',
-        'tags': {
-            'sensor_id': sensor_id,
-        },
-        'time': datetime.datetime.now().isoformat(),
-        'fields': {
-            'temperature': temperature,
-        }
-    }
+def format_measurement(sensor_id, metadata, temp_all_units):
+    value = temperature_in_scale(temp_all_units, metadata.get('scale'))
+    tags = format_measurement_tags(metadata)
+    template = 'temperature,sensor_id={sensor_id}{tags} value={value}'
+    measurement = template.format(**locals())
 
-    _measurement_add_tags(measurement['tags'], metadata)
-    log.info('Got measurement: "{}"'.format(pprint.pformat(measurement)))
+    log.info('Formatted record: "{}"'.format(measurement))
 
     return measurement
 
 
+def write_measurement(line, influx):
+    result = influx.write_points(line, time_precision='s', protocol='line')
+    if result:
+        log.debug('Datum written to InfluxDB: "{}"'.format(line))
+    else:
+        log.error('Failed to write to InfluxDB: "{}"'.format(line))
+
+
 def temperature_collection_loop(w1client, all_metadata, influx):
     while True:
-        measurements = []
         for sensor in w1client.get_available_sensors():
             temp_all_units = sensor.get_temperatures([
                 w1client.DEGREES_C,
                 w1client.DEGREES_F,
                 w1client.KELVIN])
             sensor_meta = all_metadata.get(sensor.id)
-            body = new_measurement(sensor.id, sensor_meta, temp_all_units)
-            measurements.append(body)
 
-        influx.write_points(measurements, time_precision='s')
+            write_measurement(
+                format_measurement(sensor.id, sensor_meta, temp_all_units),
+                influx
+            )
 
         time.sleep(1)
 
