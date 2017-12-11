@@ -188,7 +188,7 @@ def temperature_collection_loop(w1client, all_metadata, influx):
                 w1client.DEGREES_C,
                 w1client.DEGREES_F,
                 w1client.KELVIN])
-            sensor_meta = all_metadata.get(sensor.id)
+            sensor_meta = all_metadata.get(sensor.id, {})
 
             write_measurement(
                 format_measurement(sensor.id, sensor_meta, temp_all_units),
