@@ -47,6 +47,7 @@ def _ssh_read_file(user, host, ssh_key, file_path):
     command = 'cat {}'.format(file_path)
     ssh_cmd = ('ssh -o KexAlgorithms=+diffie-hellman-group1-sha1 '
                '-o StrictHostKeyChecking=no '
+               '-o ConnectTimeout=2 '
                '-i {ssh_key} {user}@{host} -- {command}'.format(**locals()))
     try:
         collectd.debug('asus plugin: running {}'.format(ssh_cmd))
