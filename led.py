@@ -9,19 +9,19 @@ import time
 YELLOW_PIN = 23
 GREEN_PIN = 24
 RED_PIN = 25
-ALL_PINS=(YELLOW_PIN, GREEN_PIN, RED_PIN)
+ALL_PINS = (YELLOW_PIN, GREEN_PIN, RED_PIN)
+
 
 def signal_handler(signal, frame):
     print('Setting {} low and exiting'.format(ALL_PINS))
     GPIO.output(ALL_PINS, GPIO.LOW)
     sys.exit(0)
 
+
 def cycle_pin(pin, interval=0.1):
-    print('Pin {} on'.format(pin))
     GPIO.output(pin, GPIO.HIGH)
     time.sleep(interval)
 
-    print('Pin {} off'.format(pin))
     GPIO.output(pin, GPIO.LOW)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -32,3 +32,4 @@ while True:
     cycle_pin(RED_PIN)
     cycle_pin(GREEN_PIN)
     cycle_pin(YELLOW_PIN)
+    print('Cycled pins {}.'.format(ALL_PINS))

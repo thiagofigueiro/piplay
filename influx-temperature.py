@@ -180,6 +180,11 @@ def write_measurement(line, influx):
     else:
         log.error('Failed to write to InfluxDB: "{}"'.format(line))
 
+def is_valid_reading(metadata, temp_all_units):
+    value = temperature_in_scale(temp_all_units, metadata.get('scale'))
+    if value < -10 or value > 60:
+        return False
+    return True
 
 def temperature_collection_loop(w1client, all_metadata, influx):
     while True:
@@ -190,10 +195,11 @@ def temperature_collection_loop(w1client, all_metadata, influx):
                 w1client.KELVIN])
             sensor_meta = all_metadata.get(sensor.id, {})
 
-            write_measurement(
-                format_measurement(sensor.id, sensor_meta, temp_all_units),
-                influx
-            )
+            line = format_measurement(sensor.id, sensor_meta, temp_all_units),
+            if is_valid_reading(sensor_meta, temp_all_units):
+                write_measurement(line, influx)
+            else:
+                log.error('Ignored bad temperature: "{}"'.format(line))
 
         time.sleep(1)
 
