@@ -87,11 +87,11 @@ def collectd_read():
         try:
             raw_value = _read_interface(CONFIG['interface'], metric)
             metric_value = int(raw_value)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as e:
             collectd.error(
                 'asus plugin: could not convert metric {metric}({raw_value}) '
                 'to int'.format(**locals()))
-            continue
+            raise e
         _dispatch(metric, metric_value, host=CONFIG['host'])
 
 
