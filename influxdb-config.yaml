@@ -14,7 +14,8 @@
 # udp_port (int) – UDP port to connect to InfluxDB, defaults to 4444
 # proxies (dict) – HTTP(S) proxy to use for Requests, defaults to {}
 ---
-host: '192.168.1.4'
+#host: '192.168.1.4'
+host: '192.168.1.15'
 # port: 8086
 # username: 'root'
 # password: 'root'
