@@ -114,6 +114,26 @@ def _hdd_metrics_temperature(hdd_id):
     return meta
 
 
+def _system_temperature():
+    # NAS-MIB.txt
+    # hdTemperature OBJECT-TYPE
+    #     SYNTAX  DisplayString
+    #     ACCESS  read-only
+    #     STATUS  mandatory
+    #     DESCRIPTION
+    #             "Hard disk temperature."
+    #     ::= { hdEntry 3 }
+    # e.g.: b'38 C/100 F'
+    # fahrenheit = v.decode('utf-8').split('/')[1].split(' ')[0]
+    return {
+        'type': 'temperature',
+        'instance': '0',
+        'description': 'system',
+        'value': 'oid:1.3.6.1.4.1.24681.1.2.6.0',  # "35 C/95 F"
+        'value_parse_method': parse_hdd_temperature,
+    }
+
+
 def _hdd_metrics_size(hdd_id):
     # NAS-MIB.txt
     # hdCapacity OBJECT-TYPE
@@ -203,7 +223,7 @@ WANTED_STATS = [_hdd_metrics_temperature(hdd_id) for hdd_id in range(1, 5)] + \
                [_hdd_metrics_status(hdd_id) for hdd_id in range(1, 5)] + \
                [_hdd_metrics_size(hdd_id) for hdd_id in range(1, 5)] + \
                [_hdd_metrics_smart(hdd_id) for hdd_id in range(1, 5)] + \
-               [_cpu_metrics()]
+               [_cpu_metrics(), _system_temperature()]
 
 
 def snmp_get(oid):
