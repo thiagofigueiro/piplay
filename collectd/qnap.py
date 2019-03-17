@@ -4,7 +4,7 @@ import sys
 # Python 2 compatibility
 try:
     ModuleNotFoundError
-except:
+except NameError:
     ModuleNotFoundError = ImportError
 
 try:
@@ -32,34 +32,178 @@ except ModuleNotFoundError:
 # defaults are overridden by collectd configuration
 SNMP_CONFIG = {
     'hostname': 'my-hostname',
-    'host': '192.168.1.1',
+    'host': '192.168.1.13',
     'community': 'public',
 }
 
 
-def parse_temperature(value):
-    # e.g. return value from qnap: b'38 C/100 F'
-    # fahrenheit = v.decode('utf-8').split('/')[1].split(' ')[0]
+def parse_cpu(value):
+    percentage = value.decode('utf-8').split(' ')[0]
+    return float(percentage)
+
+
+def parse_hdd_temperature(value):
     celsius = value.decode('utf-8').split(' ')[0]
     return int(celsius)
 
 
-def _hdd_temp_stat(hdd_id):
-    return {
-               'type': 'temperature',
-               'instance': '1.3.6.1.4.1.24681.1.2.11.1.2.' + hdd_id,
-               'description': '1.3.6.1.4.1.24681.1.2.11.1.5.' + hdd_id,
-               'value': '1.3.6.1.4.1.24681.1.2.11.1.3.' + hdd_id,
-               'value_parse_method': parse_temperature
+def parse_hdd_size(value):
+    size = value.decode('utf-8').split(' ')[0]
+    return float(size)
+
+
+def parse_hdd_smart(value):
+    # https://www.qnap.com/en/how-to/faq/article/what-is-the-definition-of-hdd-s-m-a-r-t-status-abnormal-normal-good/
+    smart_map = {
+        'abnormal': -1,
+        'normal': 0,
+        'good': 1,
     }
+    smart = 999  # unknown
+    try:
+        smart = smart_map[value.decode('utf-8').strip().lower()]
+    except KeyError:
+        pass
+    return int(smart)
 
 
-WANTED_STATS = [
-    _hdd_temp_stat('1'),  # HDD1
-    _hdd_temp_stat('2'),  # HDD2
-    _hdd_temp_stat('3'),  # HDD3
-    _hdd_temp_stat('4'),  # HDD4
-]
+def _hdd_metrics_base(hdd_id):
+    return {
+        # hdIndex OBJECT-TYPE
+        #     SYNTAX  INTEGER
+        #     ACCESS  read-only
+        #     STATUS  mandatory
+        #     DESCRIPTION
+        #             "A unique value for each hard disk.  Its value
+        #             ranges between 1 and the value of IfNumber.  The
+        #             value for each interface must remain constant at
+        #             least from one re-initialization of the entity's
+        #             network management system to the next re-
+        #             initialization."
+        #     ::= { hdEntry 1 }
+        # e.g.: "HDDx"
+        'instance': 'oid:1.3.6.1.4.1.24681.1.2.11.1.2.%s' % hdd_id,
+        # hdModel OBJECT-TYPE
+        #     SYNTAX  DisplayString
+        #     ACCESS  read-only
+        #     STATUS  mandatory
+        #     DESCRIPTION "Hard disk model."
+        #     ::= { hdEntry 5 }
+        # e.g.: "WD40EZRX-00SPEB0\n"
+        'description': 'oid:1.3.6.1.4.1.24681.1.2.11.1.5.%s' % hdd_id,
+    }.copy()
+
+
+def _hdd_metrics_temperature(hdd_id):
+    # NAS-MIB.txt
+    # hdTemperature OBJECT-TYPE
+    #     SYNTAX  DisplayString
+    #     ACCESS  read-only
+    #     STATUS  mandatory
+    #     DESCRIPTION
+    #             "Hard disk temperature."
+    #     ::= { hdEntry 3 }
+    # e.g.: b'38 C/100 F'
+    # fahrenheit = v.decode('utf-8').split('/')[1].split(' ')[0]
+    meta = _hdd_metrics_base(hdd_id)
+    meta.update({
+        'type': 'temperature',
+        'value': 'oid:1.3.6.1.4.1.24681.1.2.11.1.3.%s' % hdd_id,  # "35 C/95 F"
+        'value_parse_method': parse_hdd_temperature
+    })
+    return meta
+
+
+def _hdd_metrics_size(hdd_id):
+    # NAS-MIB.txt
+    # hdCapacity OBJECT-TYPE
+    #     SYNTAX  DisplayString
+    #     ACCESS  read-only
+    #     STATUS  mandatory
+    #     DESCRIPTION "Hard disk capacity."
+    #     ::= { hdEntry 6 }
+    # e.g: "3.64 TB"
+    meta = _hdd_metrics_base(hdd_id)
+    meta.update({
+        'type': 'capacity',
+        'description': 'size',
+        'value': 'oid:1.3.6.1.4.1.24681.1.2.11.1.6.%s' % hdd_id,  # "3.64 TB"
+        'value_parse_method': parse_hdd_size
+    })
+    return meta
+
+
+def _hdd_metrics_smart(hdd_id):
+    # NAS-MIB.txt
+    # hdSmartInfo OBJECT-TYPE
+    #     SYNTAX  DisplayString
+    #     ACCESS  read-only
+    #     STATUS  mandatory
+    #     DESCRIPTION "Hard disk SMART information."
+    #     ::= { hdEntry 7 }
+    #
+    #         modelName OBJECT-TYPE
+    #                 SYNTAX DisplayString
+    #         MAX-ACCESS read-only
+    #             STATUS     current
+    #         DESCRIPTION
+    #                         "Model name"
+    #                 ::= { systemInfo 12 }
+    #         hostName OBJECT-TYPE
+    #                 SYNTAX DisplayString
+    #         MAX-ACCESS read-only
+    #             STATUS     current
+    #         DESCRIPTION
+    #                         "Model name"
+    #                 ::= { systemInfo 13 }
+    # e.g.: "GOOD"
+    meta = _hdd_metrics_base(hdd_id)
+    meta.update({
+        'type': 'absolute',
+        'description': 'smart_status',
+        'value': 'oid:1.3.6.1.4.1.24681.1.2.11.1.7.%s' % hdd_id,  # "GOOD"
+        'value_parse_method': parse_hdd_smart
+    })
+    return meta
+
+
+def _hdd_metrics_status(hdd_id):
+    # NAS-MIB.txt
+    # hdStatus OBJECT-TYPE
+    #     SYNTAX     INTEGER {
+    #         ready(0), noDisk(-5), invalid(-6), rwError(-9), unknown(-4) }
+    #     ACCESS  read-only
+    #     STATUS  mandatory
+    #     DESCRIPTION
+    #             "HDD status. 0:not availible, 1:availible."
+    #     ::= { hdEntry 4 }
+    meta = _hdd_metrics_base(hdd_id)
+    meta.update({
+        'type': 'absolute',
+        'description': 'status',
+        'value': 'oid:1.3.6.1.4.1.24681.1.2.11.1.4.%s' % hdd_id,
+    })
+    return meta
+
+
+def _cpu_metrics():
+    #
+    # NAS-MIB.txt
+    meta = {
+        'type': 'percent',
+        'instance': '0',
+        'description': 'cpu_usage',
+        'value': 'oid:1.3.6.1.4.1.24681.1.2.1.0',
+        'value_parse_method': parse_cpu
+    }
+    return meta
+
+
+WANTED_STATS = [_hdd_metrics_temperature(hdd_id) for hdd_id in range(1, 5)] + \
+               [_hdd_metrics_status(hdd_id) for hdd_id in range(1, 5)] + \
+               [_hdd_metrics_size(hdd_id) for hdd_id in range(1, 5)] + \
+               [_hdd_metrics_smart(hdd_id) for hdd_id in range(1, 5)] + \
+               [_cpu_metrics()]
 
 
 def snmp_get(oid):
@@ -67,7 +211,6 @@ def snmp_get(oid):
     host = SNMP_CONFIG['host']
     if hasattr(host, 'decode'):
         host = host.decode('utf-8')
-
     return puresnmp.get(host, SNMP_CONFIG['community'], oid)
 
 
@@ -75,7 +218,10 @@ def read_single(stat_meta):
     result = {'type': stat_meta['type']}
 
     for k in ['description', 'instance', 'value']:
-        result[k] = snmp_get(stat_meta[k])
+        if stat_meta[k].startswith('oid:'):
+            result[k] = snmp_get(stat_meta[k][4:])  # strip "oid:"
+        else:
+            result[k] = stat_meta[k]
 
     value_parse_method = stat_meta.get('value_parse_method')
     if callable(value_parse_method):
