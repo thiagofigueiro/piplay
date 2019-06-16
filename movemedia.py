@@ -12,14 +12,17 @@ OMDBAPI_KEY = os.environ['OMDBAPI_KEY']
 MEDIA_SUFFIXES = ['.mkv', '.mp4']
 TV_BASE = Path('/mnt/Multimedia/TV')
 MOVIE_BASE = Path('/mnt/Multimedia/Moohovies')
+# FIXME: refactor TV_MOVED
+TV_MOVED = {}
 
-
-# TODO: more mappings, move to config file
+# TODO: move to config file
 LOCATION_MAPPINGS = [
+    # old show with same name
     {'re': re.compile(r'^archer[\W]', re.IGNORECASE),
      'destination': TV_BASE / 'Archer (2009)'},
-    {'re': re.compile(r'^the[\W]handmaids[\W]tale', re.IGNORECASE),
-     'destination': TV_BASE / 'The Handmaids Tale'},
+    # no episode in filename
+    {'re': re.compile(r'^stephen[\W]colbert', re.IGNORECASE),
+     'destination': TV_BASE / 'Stephen Colbert'},
 ]
 
 
@@ -58,6 +61,40 @@ def is_movie(file):
     return False
 
 
+def destination_guess(file):
+    def _is_match(a, b):
+        return a['season'] == b['season'] and a['episode'] == b['episode']
+
+
+    def _append_moved(mlist, mdata):
+        mlist.append({
+            'season': mdata['season'], 'episode': mdata['episode']
+        })
+
+
+    def _is_tv_episode(mdata):
+        return mdata['title'] and mdata.get('season') and mdata.get('episode')
+
+    metadata = PTN.parse(file.name)
+
+    if not _is_tv_episode(metadata):
+        return None
+
+    title = metadata['title'].title()
+
+    moved_episodes = TV_MOVED.get(title)
+    if moved_episodes is None:
+        TV_MOVED[title] = []
+
+    for entry in TV_MOVED[title]:
+        if _is_match(metadata, entry):
+            return None
+
+    _append_moved(TV_MOVED[title], metadata)
+
+    return TV_BASE.joinpath(metadata['title'])
+
+
 def get_destination(file):
     # TODO: move based on TVDB information
     for re, destination in location_iter():
@@ -71,6 +108,25 @@ def get_destination(file):
     if is_movie(file):
         return MOVIE_BASE
 
+    return destination_guess(file)
+
+
+def move_with_create(file_path, target_path):
+    if target_path.joinpath(f.name).exists():
+        print(f'    ERROR. Already exists: {target_path.joinpath(f.name)}')
+        return False
+
+    if not target_path.exists():
+        os.makedirs(str(target_path), mode=0o777)
+
+    try:
+        shutil.move(str(file_path), str(target_path))
+    except (shutil.Error, OSError) as e:
+        print(f'    ERROR. {e}')
+        return False
+
+    return True
+
 
 print('Processing media files')
 processed_files = DumbDB('movemedia_processed.txt')
@@ -83,16 +139,10 @@ for f in media_iter('/home/thiago/putio'):
     print(f)
 
     target_path = get_destination(f)
-    if target_path is None:
-        print(f'    Destination not found')
-    else:
-        if target_path.joinpath(f.name).exists():
-            print(f'    ERROR. Already exists: {target_path.joinpath(f.name)}')
-        else:
-            print(f'    ↦ Moving to {target_path}', end='')
-            shutil.move(str(f), str(target_path))
-            print()
-            something_moved = True
+    if target_path is not None:
+        print(f'    ↦ Moving to {target_path}', end='', flush=True)
+        move_with_create(f, target_path)
+        print()
 
     processed_files.add(str(f))
 
