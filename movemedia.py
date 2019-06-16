@@ -99,10 +99,6 @@ def get_destination(file):
     # TODO: move based on TVDB information
     for re, destination in location_iter():
         if re.match(file.name):
-            if not destination.is_dir():
-                print(f'    ERROR. Not a directory: {destination}')
-                return None
-
             return destination
 
     if is_movie(file):
