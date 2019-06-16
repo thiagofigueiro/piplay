@@ -18,6 +18,8 @@ MOVIE_BASE = Path('/mnt/Multimedia/Moohovies')
 LOCATION_MAPPINGS = [
     {'re': re.compile(r'^archer[\W]', re.IGNORECASE),
      'destination': TV_BASE / 'Archer (2009)'},
+    {'re': re.compile(r'^the[\W]handmaids[\W]tale', re.IGNORECASE),
+     'destination': TV_BASE / 'The Handmaids Tale'},
 ]
 
 
