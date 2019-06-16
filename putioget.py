@@ -4,6 +4,9 @@ import os
 import putiopy
 import requests
 
+from dumbdb import DumbDB
+
+
 logging.basicConfig(
     level=getattr(logging, os.environ.get('LOG_LEVEL', 'warning').upper()))
 log = logging.getLogger()
@@ -11,6 +14,8 @@ log = logging.getLogger()
 client = putiopy.Client(os.environ['PUTIO_OAUTH_TOKEN'])
 wanted_names = ['showrss', 'chill.institute']
 wanted_extensions = ['mp4', 'mkv']
+downloaded_files = DumbDB('downloaded_before.txt')
+
 
 # find wanted resource ids
 def get_wanted_ids(wanted_names):
@@ -19,24 +24,6 @@ def get_wanted_ids(wanted_names):
         if file_resource.name in wanted_names:
             ids.append(file_resource.id)
     return ids
-
-def mark_as_downloaded(resource_id):
-    with open("downloaded_before.txt", "a") as f:
-        f.write(str(resource_id))
-        f.write('\n')
-
-
-def downloaded_before(resource_id):
-    str_id = str(resource_id)
-    try:
-        with open('downloaded_before.txt', 'r') as f:
-            for line in f:
-                if line.strip() == str_id:
-                    return True
-    except FileNotFoundError:
-        pass
-
-    return False
 
 
 def get_files(resource_id, _seen=[]):
@@ -62,7 +49,7 @@ def get_files(resource_id, _seen=[]):
             log.debug(
                 '   ↦ Maybe wanted %d %s', file_resource.id, file_resource.name)
 
-            if downloaded_before(file_resource.id):
+            if downloaded_files.exists(file_resource.id):
                 continue
 
             if file_resource.extension.lower() in wanted_extensions:
@@ -114,4 +101,4 @@ def aria2_download(url, dir='/home/thiago/putio'):
 for f in wanted_files:
     if aria2_download(f.get_download_link()):
         log.info(f'Added {f.id} ({f.name}) to aria2 queue')
-        mark_as_downloaded(f.id)
+        downloaded_files.add(f.id)
