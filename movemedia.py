@@ -15,22 +15,6 @@ MOVIE_BASE = Path('/mnt/Multimedia/Moohovies')
 # FIXME: refactor TV_MOVED
 TV_MOVED = {}
 
-# TODO: move to config file
-LOCATION_MAPPINGS = [
-    # old show with same name
-    {'re': re.compile(r'^archer[\W]', re.IGNORECASE),
-     'destination': TV_BASE / 'Archer (2009)'},
-    # no episode in filename
-    {'re': re.compile(r'^stephen[\W]colbert', re.IGNORECASE),
-     'destination': TV_BASE / 'Stephen Colbert'},
-]
-
-
-def location_iter():
-    for location_mapping in LOCATION_MAPPINGS:
-        yield location_mapping['re'], location_mapping['destination']
-
-
 def media_iter(source_path):
     for file in Path(source_path).glob('**/*'):
         # skip downloads in progress
@@ -92,15 +76,10 @@ def destination_guess(file):
 
     _append_moved(TV_MOVED[title], metadata)
 
-    return TV_BASE.joinpath(metadata['title'])
+    return TV_BASE.joinpath(metadata['title'].title())
 
 
 def get_destination(file):
-    # TODO: move based on TVDB information
-    for re, destination in location_iter():
-        if re.match(file.name):
-            return destination
-
     if is_movie(file):
         return MOVIE_BASE
 
