@@ -17,16 +17,19 @@ TV_MOVED = {}
 
 def media_iter(source_path):
     for file in Path(source_path).glob('**/*'):
-        # skip downloads in progress
+        # skip downloads in progress (f.ext -> f.ext.aria2)
         if file.with_suffix(file.suffix + '.aria2').exists():
+            continue
+
+        # skip non-media files
+        if file.suffix not in MEDIA_SUFFIXES:
             continue
 
         # skip empty files
         if file.stat().st_size == 0:
             continue
 
-        if file.suffix in MEDIA_SUFFIXES:
-            yield file
+        yield file
 
 
 def is_movie(file):
