@@ -12,8 +12,21 @@ OMDBAPI_KEY = os.environ['OMDBAPI_KEY']
 MEDIA_SUFFIXES = ['.mkv', '.mp4']
 TV_BASE = Path('/mnt/Multimedia/TV')
 MOVIE_BASE = Path('/mnt/Multimedia/Moohovies')
-# FIXME: refactor TV_MOVED
+# FIXME refactor TV_MOVED
 TV_MOVED = {}
+
+# FIXME Talkshows like Stephen Colbert get funky metadata
+# e.g.: Stephen.Colbert.2019.07.24.Chris.Wallace.PROPER.1080p.WEB.x264-KOMPOST.mkv
+#    'year': 2019, 
+#    'resolution': '1080p', 
+#    'codec': 'x264', 
+#    'group': 'KOMPOST.mkv', 
+#    'proper': True, 
+#    'container': 'mkv', 
+#    'title': 'Stephen Colbert', 
+#    'excess': ['07.24.Chris.Wallace', 'WEB']
+KNOWN_TV_TITLES = ['stephen colbert']
+
 
 def media_iter(source_path):
     for file in Path(source_path).glob('**/*'):
@@ -38,14 +51,26 @@ def is_movie(file):
     """
     metadata = PTN.parse(file.name)
     if not (metadata['title'] and metadata.get('year')):
+        print('    x Not a movie: missing title and/or year')
         return False
 
     movie = GetMovie(title=metadata['title'], api_key=OMDBAPI_KEY)
     maybe_year = movie.get_data('Year')['Year']
-    if str(metadata['year']) == str(maybe_year):
+    if not str(metadata['year']) == str(maybe_year):
+        print(f'    x Not a movie: year on filename does not match OMDB {maybe_year}')
+        return False
+
+    return True
+
+
+def _is_tv_episode(mdata):
+    # FIXME Talkshows like Stephen Colbert get funky metadata
+    if mdata['title'].lower() in KNOWN_TV_TITLES:
+        mdata['season'] = mdata.get('season', 'no-season')
+        mdata['episode'] = mdata.get('episode', mdata.get('excess', 'no-episode'))
         return True
 
-    return False
+    return mdata['title'] and mdata.get('season') and mdata.get('episode')
 
 
 def destination_guess(file):
@@ -59,12 +84,10 @@ def destination_guess(file):
         })
 
 
-    def _is_tv_episode(mdata):
-        return mdata['title'] and mdata.get('season') and mdata.get('episode')
-
     metadata = PTN.parse(file.name)
 
     if not _is_tv_episode(metadata):
+        print(f'    x Not TV: missing title, season and/or episode {metadata}', end='', flush=True)
         return None
 
     title = metadata['title'].title()
