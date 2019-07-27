@@ -106,10 +106,13 @@ def destination_guess(file):
 
 
 def get_destination(file):
-    if is_movie(file):
-        return MOVIE_BASE
+    destination = destination_guess(file)
 
-    return destination_guess(file)
+    if destination is None:
+        if is_movie(file):
+            destination = MOVIE_BASE
+
+    return destination
 
 
 def move_with_create(file_path, target_path):
