@@ -55,9 +55,14 @@ def is_movie(file):
         return False
 
     movie = GetMovie(title=metadata['title'], api_key=OMDBAPI_KEY)
-    maybe_year = movie.get_data('Year')['Year']
-    if not str(metadata['year']) == str(maybe_year):
-        print(f'    x Not a movie: year on filename does not match OMDB {maybe_year}')
+    try:
+        movie_year = int(movie.get_data('Year')['Year'])
+    except ValueError:
+        print(f'    x Not a movie; not found on OMDB: {metadata["title"]}')
+        return False
+
+    if not str(metadata['year']) == str(movie_year):
+        print(f'    x Not a movie: year on filename {metadata["year"]} does not match OMDB {movie_year}')
         return False
 
     return True
@@ -87,7 +92,7 @@ def destination_guess(file):
     metadata = PTN.parse(file.name)
 
     if not _is_tv_episode(metadata):
-        print(f'    x Not TV: missing title, season and/or episode {metadata}', end='', flush=True)
+        print(f'    x Not TV: missing title, season and/or episode {metadata}')
         return None
 
     title = metadata['title'].title()
