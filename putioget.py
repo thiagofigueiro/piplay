@@ -12,62 +12,32 @@ logging.basicConfig(
 log = logging.getLogger()
 
 client = putiopy.Client(os.environ['PUTIO_OAUTH_TOKEN'])
-wanted_names = ['showrss', 'chill.institute']
-wanted_extensions = ['mp4', 'mkv']
 downloaded_files = DumbDB('downloaded_before.txt')
 
 
-# find wanted resource ids
-def get_wanted_ids(wanted_names):
-    ids = []
-    for file_resource in client.File.list():
-        if file_resource.name in wanted_names:
-            ids.append(file_resource.id)
-    return ids
-
-
-def get_files(resource_id, _seen=[]):
-    wanted_files = []
-    log.info('Scanning %s', resource_id)
-    for file_resource in client.File.list(resource_id):
+def get_missing_files(file_resources):
+    missing_files = []
+    for file_resource in file_resources:
         log.debug(
             ' ↦ Analysing %s %d %s', file_resource.file_type, file_resource.id,
             file_resource.name)
-        if file_resource.id in _seen:
-            log.debug(
-                '   ↦ Already seen %d %s', file_resource.id, file_resource.name)
+
+        log.debug(
+            '   ↦ Maybe wanted %d %s', file_resource.id, file_resource.name)
+
+        if downloaded_files.exists(file_resource.id):
             continue
 
-        if file_resource.file_type == 'FOLDER':
-            _seen.append(file_resource.id)
-            log.debug(
-                '   ↦ Traversing to %d %s', file_resource.id,
-                file_resource.name)
-            wanted_files += get_files(file_resource.id, _seen=_seen)
+        missing_files.append(file_resource)
 
-        if file_resource.file_type == 'VIDEO':
-            log.debug(
-                '   ↦ Maybe wanted %d %s', file_resource.id, file_resource.name)
-
-            if downloaded_files.exists(file_resource.id):
-                continue
-
-            if file_resource.extension.lower() in wanted_extensions:
-                log.debug('     ↦ Wanted')
-                wanted_files.append(file_resource)
-
-    log.debug('Partial wanted\n%s', wanted_files)
-    return wanted_files
+        log.debug('Partial wanted\n%s', missing_files)
+    return missing_files
 
 
-def get_multiple_files(resource_ids):
-    wanted_files = []
-    for resource_id in resource_ids:
-        wanted_files += get_files(resource_id)
-    return wanted_files
-
-wanted_ids = get_wanted_ids(wanted_names)
-wanted_files = get_multiple_files(wanted_ids)
+def get_missing_videos():
+    resource_ids = client.File.list(parent_id=-1, file_type='VIDEO')
+    log.debug(' ↦ Found %d videos', len(resource_ids))
+    return get_missing_files(resource_ids)
 
 
 def aria2_download(url, dir='/home/thiago/putio'):
@@ -98,7 +68,7 @@ def aria2_download(url, dir='/home/thiago/putio'):
     return False
 
 
-for f in wanted_files:
+for f in get_missing_videos():
     if aria2_download(f.get_download_link()):
         log.info(f'Added {f.id} ({f.name}) to aria2 queue')
         downloaded_files.add(f.id)
