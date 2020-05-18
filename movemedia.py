@@ -49,24 +49,32 @@ def media_iter(source_path):
         yield file
 
 
+def get_movie_title_year(file):
+    metadata = PTN.parse(file.name)
+    if not (metadata['title'] and metadata.get('year')):
+        return None
+
+    return metadata['title'], metadata['year']
+
+
 def is_movie(file):
     """
     :type file: Path
     """
-    metadata = PTN.parse(file.name)
-    if not (metadata['title'] and metadata.get('year')):
+    title, year = get_movie_title_year(file)
+    if not (title and year):
         print('    x Not a movie: missing title and/or year')
         return False
 
-    movie = GetMovie(title=metadata['title'], api_key=OMDBAPI_KEY)
+    movie = GetMovie(title=title, api_key=OMDBAPI_KEY)
     try:
         movie_year = int(movie.get_data('Year')['Year'])
     except ValueError:
-        print(f'    x Not a movie; not found on OMDB: {metadata["title"]}')
+        print(f'    x Not a movie; not found on OMDB: {title}')
         return False
 
-    if not str(metadata['year']) == str(movie_year):
-        print(f'    x Not a movie: year on filename {metadata["year"]} does not match OMDB {movie_year}')
+    if not str(year) == str(movie_year):
+        print(f'    x Not a movie: year on filename {year} does not match OMDB {movie_year}')
         return False
 
     return True
@@ -114,12 +122,20 @@ def destination_guess(file):
     return TV_BASE.joinpath(metadata['title'].title())
 
 
+def safe_filename(name):
+    safe_chars = ' .-_'
+    return "".join([c for c in name if c.isalpha() or c.isdigit() or c in safe_chars]).rstrip()
+
+
 def get_destination(file):
     destination = destination_guess(file)
 
     if destination is None:
         if is_movie(file):
-            destination = MOVIE_BASE
+            title, year = get_movie_title_year(file)
+            folder = safe_filename(f'{title}.{year}')
+            destination = MOVIE_BASE.joinpath(folder)
+            destination.mkdir()
 
     return destination
 
