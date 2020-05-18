@@ -172,6 +172,7 @@ for f in media_iter('/home/thiago/putio'):
         print(f'    ↦ Moving to {target_path}', end='', flush=True)
         move_with_create(f, target_path)
         print()
+        something_moved = True
 
     processed_files.add(str(f))
 
