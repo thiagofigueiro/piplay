@@ -11,7 +11,7 @@ from dumbdb import DumbDB
 OMDBAPI_KEY = os.environ['OMDBAPI_KEY']
 MEDIA_SUFFIXES = ['.mkv', '.mp4']
 TV_BASE = Path('/mnt/Multimedia/TV')
-MOVIE_BASE = Path('/mnt/Multimedia/Moohovies')
+MOVIE_BASE = Path('/mnt/Multimedia/Movies')
 # FIXME refactor TV_MOVED
 TV_MOVED = {}
 
@@ -30,6 +30,10 @@ KNOWN_TV_TITLES = ['stephen colbert']
 
 def media_iter(source_path):
     for file in Path(source_path).glob('**/*'):
+        # skip APF stuff
+        if '.AppleDouble' in str(file.absolute()):
+            continue
+
         # skip downloads in progress (f.ext -> f.ext.aria2)
         if file.with_suffix(file.suffix + '.aria2').exists():
             continue
