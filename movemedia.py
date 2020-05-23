@@ -1,9 +1,12 @@
 import os
 import re
 import shutil
+import time
+
+from pathlib import Path
+
 import PTN  # https://github.com/divijbindlish/parse-torrent-name
 from omdbapi.movie_search import GetMovie  # ombdapi==0.5.1
-from pathlib import Path
 
 from dumbdb import DumbDB
 
@@ -14,6 +17,7 @@ TV_BASE = Path('/mnt/Multimedia/TV')
 MOVIE_BASE = Path('/mnt/Multimedia/Movies')
 # FIXME refactor TV_MOVED
 TV_MOVED = {}
+MIN_MTIME_TO_MOVE = 60  # don't move files modified less than second ago
 
 # FIXME Talkshows like Stephen Colbert get funky metadata
 # e.g.: Stephen.Colbert.2019.07.24.Chris.Wallace.PROPER.1080p.WEB.x264-KOMPOST.mkv
@@ -30,6 +34,10 @@ KNOWN_TV_TITLES = ['stephen colbert']
 
 def media_iter(source_path):
     for file in Path(source_path).glob('**/*'):
+        # skip non-media files
+        if file.suffix not in MEDIA_SUFFIXES:
+            continue
+
         # skip APF stuff
         if '.AppleDouble' in str(file.absolute()):
             continue
@@ -38,12 +46,12 @@ def media_iter(source_path):
         if file.with_suffix(file.suffix + '.aria2').exists():
             continue
 
-        # skip non-media files
-        if file.suffix not in MEDIA_SUFFIXES:
-            continue
-
         # skip empty files
         if file.stat().st_size == 0:
+            continue
+
+        # skip files that were recently modified
+        if (time.time() - file.stat().st_mtime) < MIN_MTIME_TO_MOVE:
             continue
 
         yield file
@@ -52,7 +60,7 @@ def media_iter(source_path):
 def get_movie_title_year(file):
     metadata = PTN.parse(file.name)
     if not (metadata['title'] and metadata.get('year')):
-        return None
+        return None, None
 
     return metadata['title'], metadata['year']
 
